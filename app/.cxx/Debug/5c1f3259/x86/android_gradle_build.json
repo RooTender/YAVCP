@@ -1,0 +1,38 @@
+{
+  "buildFiles": [
+    "/home/rootender/Documents/hello-vulkan/app/src/main/cpp/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/rootender/Android/Sdk/cmake/3.18.1/bin/ninja",
+      "-C",
+      "/home/rootender/Documents/hello-vulkan/app/.cxx/Debug/5c1f3259/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/rootender/Android/Sdk/cmake/3.18.1/bin/ninja",
+    "-C",
+    "/home/rootender/Documents/hello-vulkan/app/.cxx/Debug/5c1f3259/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "hellovkjni::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "hellovkjni",
+      "output": "/home/rootender/Documents/hello-vulkan/app/build/intermediates/cxx/Debug/5c1f3259/obj/x86/libhellovkjni.so",
+      "runtimeFiles": []
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/rootender/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/rootender/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

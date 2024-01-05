@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/rootender/Documents/hello-vulkan/app/.cxx/RelWithDebInfo/655c5a2w/x86",
+  "command": "/home/rootender/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++ --target=i686-none-linux-android30 --sysroot=/home/rootender/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/linux-x86_64/sysroot -DVK_USE_PLATFORM_ANDROID_KHR=1 -Dhellovkjni_EXPORTS -isystem /home/rootender/.gradle/caches/transforms-3/5c09d8652f4603aec8db53cec70f5fa0/transformed/jetified-games-activity-1.2.2-alpha01/prefab/modules/game-activity_static/include -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -std=c++17 -Wall -O2 -g -DNDEBUG -fPIC -o CMakeFiles/hellovkjni.dir/vk_main.cpp.o -c /home/rootender/Documents/hello-vulkan/app/src/main/cpp/vk_main.cpp",
+  "file": "/home/rootender/Documents/hello-vulkan/app/src/main/cpp/vk_main.cpp"
+}
+]

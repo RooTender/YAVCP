@@ -1,0 +1,20 @@
+                    -H/home/rootender/Documents/hello-vulkan/app/src/main/cpp
+-DCMAKE_SYSTEM_NAME=Android
+-DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+-DCMAKE_SYSTEM_VERSION=30
+-DANDROID_PLATFORM=android-30
+-DANDROID_ABI=x86
+-DCMAKE_ANDROID_ARCH_ABI=x86
+-DANDROID_NDK=/home/rootender/Android/Sdk/ndk/26.1.10909125
+-DCMAKE_ANDROID_NDK=/home/rootender/Android/Sdk/ndk/26.1.10909125
+-DCMAKE_TOOLCHAIN_FILE=/home/rootender/Android/Sdk/ndk/26.1.10909125/build/cmake/android.toolchain.cmake
+-DCMAKE_MAKE_PROGRAM=/home/rootender/Android/Sdk/cmake/3.18.1/bin/ninja
+-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/rootender/Documents/hello-vulkan/app/build/intermediates/cxx/RelWithDebInfo/232i4lj4/obj/x86
+-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/rootender/Documents/hello-vulkan/app/build/intermediates/cxx/RelWithDebInfo/232i4lj4/obj/x86
+-DCMAKE_BUILD_TYPE=RelWithDebInfo
+-DCMAKE_FIND_ROOT_PATH=/home/rootender/Documents/hello-vulkan/app/.cxx/RelWithDebInfo/232i4lj4/prefab/x86/prefab
+-B/home/rootender/Documents/hello-vulkan/app/.cxx/RelWithDebInfo/232i4lj4/x86
+-GNinja
+-DANDROID_STL=c++_shared
+                    Build command args: []
+                    Version: 2

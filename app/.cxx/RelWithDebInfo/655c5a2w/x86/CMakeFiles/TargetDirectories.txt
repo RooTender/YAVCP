@@ -1,0 +1,3 @@
+/home/rootender/Documents/hello-vulkan/app/.cxx/RelWithDebInfo/655c5a2w/x86/CMakeFiles/rebuild_cache.dir
+/home/rootender/Documents/hello-vulkan/app/.cxx/RelWithDebInfo/655c5a2w/x86/CMakeFiles/edit_cache.dir
+/home/rootender/Documents/hello-vulkan/app/.cxx/RelWithDebInfo/655c5a2w/x86/CMakeFiles/hellovkjni.dir
