@@ -3,12 +3,12 @@
 
 #endif //YAVCP_VK_CORE_H
 
-#include "../../../../../../../Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/log.h"
-#include "../../../../../../../Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/native_window.h"
-#include "../../../../../../../Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/android/native_window_jni.h"
+#include "android/log.h"
+#include "android/native_window.h"
+#include "android/native_window_jni.h"
 
-#include "../../../../../../../Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/assert.h"
-#include "../../../../../../../Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include/vulkan/vulkan.h"
+#include "assert.h"
+#include "vulkan/vulkan.h"
 
 namespace vkt
 {
