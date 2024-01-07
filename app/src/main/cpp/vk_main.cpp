@@ -23,7 +23,7 @@
 
 #include <iostream>
 
-#include "vk_engine/vk_backend.h"
+#include "vk_engine/vk_core.h"
 
 /*
  * Shared state for the app. This will be accessed within lifecycle callbacks
@@ -41,7 +41,7 @@
  */
 struct VulkanEngine {
   struct android_app *app;
-  VKBackend *app_backend;
+  VKCore *app_backend;
   bool canRender = false;
 };
 
@@ -64,7 +64,7 @@ static void HandleCmd(struct android_app *app, int32_t cmd) {
       if (engine->app->window != nullptr) {
         LOG_INFO("Setting a new surface");
         engine->app_backend->reset(app->window, app->activity->assetManager);
-        if (!engine->app_backend->isInitialized()) {
+        if (!engine->app_backend->initialized) {
           LOG_INFO("Starting application");
           engine->app_backend->initVulkan();
         }
@@ -123,7 +123,7 @@ static void HandleInputEvents(struct android_app *app) {
  */
 void android_main(struct android_app *state) {
   VulkanEngine engine{};
-  VKBackend vulkanBackend{};
+  VKCore vulkanBackend{};
 
   engine.app = state;
   engine.app_backend = &vulkanBackend;

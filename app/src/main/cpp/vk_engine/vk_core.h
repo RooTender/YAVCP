@@ -34,18 +34,26 @@
 
 using namespace vkt;
 
-class VKCore{
+class VKCore {
 public:
-    VKCore();
+    void initVulkan();
+    void render();
+    void cleanup();
+    void cleanupSwapChain();
+    void reset(ANativeWindow *newWindow, AAssetManager *newManager);
+    bool initialized = false;
 
+private:
+    std::unique_ptr<Device> device;
+
+    void createInstance();
+    void createSurface();
     void setupDebugMessenger();
     void createSwapChain();
-    void recreateSwapChain();
-    void cleanupSwapChain();
-
     void createImageViews();
     void createRenderPass();
     void createDescriptorSetLayout();
+    void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandPool();
     void createCommandBuffer();
@@ -54,32 +62,28 @@ public:
     std::vector<const char *> getRequiredExtensions(bool enableValidation);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
     VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
+    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void recreateSwapChain();
+    void onOrientationChange();
     uint32_t findMemoryType(uint32_t typeFilter,
                             VkMemoryPropertyFlags properties);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                       VkMemoryPropertyFlags properties, VkBuffer &buffer,
                       VkDeviceMemory &bufferMemory);
     void createUniformBuffers();
+    void updateUniformBuffer(uint32_t currentImage);
     void createDescriptorPool();
     void createDescriptorSets();
     void establishDisplaySizeIdentity();
 
-    void render();
-    void reset();
-
-    ~VKCore();
-
     /*
-        * In order to enable validation layer toggle this to true and
-        * follow the README.md instructions concerning the validation
-        * layers. You will be required to add separate vulkan validation
-        * '*.so' files in order to enable this.
-        *
-        * The validation layers are not shipped with the APK as they are sizeable.
-    */
-
-protected:
-
+     * In order to enable validation layer toggle this to true and
+     * follow the README.md instructions concerning the validation
+     * layers. You will be required to add separate vulkan validation
+     * '*.so' files in order to enable this.
+     *
+     * The validation layers are not shipped with the APK as they are sizeable.
+     */
     bool enableValidationLayers = false;
 
     const std::vector<const char *> validationLayers = {
@@ -119,29 +123,15 @@ protected:
     std::vector<VkDescriptorSet> descriptorSets;
 
     uint32_t currentFrame = 0;
-    VkSurfaceTransformFlagBitsKHR pretransformFlag;
-
-    void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
-                              const VkSurfaceTransformFlagBitsKHR &pretransformFlag,
-                              std::array<float, 16> &mat);
-
-    void updateUniformBuffer(uint32_t currentImage);
-
-private:
     bool orientationChanged = false;
-
-    std::unique_ptr<Device> device;
-
-    void createInstance();
-    void createSurface();
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-
-    void createGraphicsPipeline();
+    VkSurfaceTransformFlagBitsKHR pretransformFlag;
 };
 
-VKCore::VKCore() {
+void VKCore::initVulkan() {
     createInstance();
     createSurface();
+    device = std::make_unique<Device>(instance, surface);
+
     setupDebugMessenger();
     establishDisplaySizeIdentity();
     createSwapChain();
@@ -151,20 +141,20 @@ VKCore::VKCore() {
     createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
+    createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
     createCommandBuffer();
     createSyncObjects();
-
-    device = std::make_unique<Device>(instance, surface);
-}
+    initialized = true;
+};
 
 /*
-*	Create a buffer with specified usage and memory properties
-*	i.e a uniform buffer which uses HOST_COHERENT memory
-*  Upon creation, these buffers will list memory requirements which need to be
-*  satisfied by the device in use in order to be created.
-*/
+ *	Create a buffer with specified usage and memory properties
+ *	i.e a uniform buffer which uses HOST_COHERENT memory
+ *  Upon creation, these buffers will list memory requirements which need to be
+ *  satisfied by the device in use in order to be created.
+ */
 void VKCore::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                           VkMemoryPropertyFlags properties, VkBuffer &buffer,
                           VkDeviceMemory &bufferMemory) {
@@ -196,7 +186,7 @@ void VKCore::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
  * expressed through a uint32_t.
  */
 uint32_t VKCore::findMemoryType(uint32_t typeFilter,
-                                VkMemoryPropertyFlags properties) {
+                                 VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(device->getPhysicalDevice(), &memProperties);
 
@@ -225,40 +215,6 @@ void VKCore::createUniformBuffers() {
     }
 }
 
-void VKCore::updateUniformBuffer(uint32_t currentImage) {
-    SwapChainSupportDetails swapChainSupport =
-            device->querySwapChainSupport(device->getPhysicalDevice());
-    UniformBufferObject ubo{};
-    getPrerotationMatrix(swapChainSupport.capabilities, pretransformFlag,
-                         ubo.mvp);
-    void *data;
-    vkMapMemory(device->getDevice(), uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0,
-                &data);
-    memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(device->getDevice(), uniformBuffersMemory[currentImage]);
-}
-
-/*
- * getPrerotationMatrix handles screen rotation with 3 hardcoded rotation
- * matrices (detailed below). We skip the 180 degrees rotation.
- */
-void VKCore::getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
-                                     const VkSurfaceTransformFlagBitsKHR &pretransformFlag,
-                                     std::array<float, 16> &mat) {
-    // mat is initialized to the identity matrix
-    mat = {1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
-    if (pretransformFlag & VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR) {
-        // mat is set to a 90 deg rotation matrix
-        mat = {0., 1., 0., 0., -1., 0, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
-    }
-
-    else if (pretransformFlag & VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        // mat is set to 270 deg rotation matrix
-        mat = {0., -1., 0., 0., 1., 0, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
-    }
-}
-
-
 void VKCore::createDescriptorSetLayout() {
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
@@ -274,6 +230,108 @@ void VKCore::createDescriptorSetLayout() {
 
     VK_CHECK(vkCreateDescriptorSetLayout(device->getDevice(), &layoutInfo, nullptr,
                                          &descriptorSetLayout));
+}
+
+void VKCore::reset(ANativeWindow *newWindow, AAssetManager *newManager) {
+    window.reset(newWindow);
+    assetManager = newManager;
+    if (initialized) {
+        createSurface();
+        recreateSwapChain();
+    }
+}
+
+void VKCore::recreateSwapChain() {
+    vkDeviceWaitIdle(device->getDevice());
+    cleanupSwapChain();
+    createSwapChain();
+    createImageViews();
+    createFramebuffers();
+}
+
+void VKCore::render() {
+    if (orientationChanged) {
+        onOrientationChange();
+    }
+
+    vkWaitForFences(device->getDevice(), 1, &inFlightFences[currentFrame], VK_TRUE,
+                    UINT64_MAX);
+    uint32_t imageIndex;
+    VkResult result = vkAcquireNextImageKHR(
+            device->getDevice(), swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame],
+            VK_NULL_HANDLE, &imageIndex);
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapChain();
+        return;
+    }
+    assert(result == VK_SUCCESS ||
+           result == VK_SUBOPTIMAL_KHR);  // failed to acquire swap chain image
+    updateUniformBuffer(currentFrame);
+
+    vkResetFences(device->getDevice(), 1, &inFlightFences[currentFrame]);
+    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
+
+    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+
+    VkSubmitInfo submitInfo{};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
+    VkPipelineStageFlags waitStages[] = {
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    VK_CHECK(vkQueueSubmit(device->getGraphicsQueue(), 1, &submitInfo,
+                           inFlightFences[currentFrame]));
+
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+
+    VkSwapchainKHR swapChains[] = {swapChain};
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapChains;
+    presentInfo.pImageIndices = &imageIndex;
+    presentInfo.pResults = nullptr;
+
+    result = vkQueuePresentKHR(device->getPresentQueue(), &presentInfo);
+    if (result == VK_SUBOPTIMAL_KHR) {
+        orientationChanged = true;
+    } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreateSwapChain();
+    } else {
+        assert(result == VK_SUCCESS);  // failed to present swap chain image!
+    }
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+/*
+ * getPrerotationMatrix handles screen rotation with 3 hardcoded rotation
+ * matrices (detailed below). We skip the 180 degrees rotation.
+ */
+void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
+                          const VkSurfaceTransformFlagBitsKHR &pretransformFlag,
+                          std::array<float, 16> &mat) {
+    // mat is initialized to the identity matrix
+    mat = {1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
+    if (pretransformFlag & VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR) {
+        // mat is set to a 90 deg rotation matrix
+        mat = {0., 1., 0., 0., -1., 0, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
+    }
+
+    else if (pretransformFlag & VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
+        // mat is set to 270 deg rotation matrix
+        mat = {0., -1., 0., 0., 1., 0, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
+    }
 }
 
 void VKCore::createDescriptorPool() {
@@ -321,6 +379,115 @@ void VKCore::createDescriptorSets() {
     }
 }
 
+void VKCore::updateUniformBuffer(uint32_t currentImage) {
+    SwapChainSupportDetails swapChainSupport =
+            device->querySwapChainSupport(device->getPhysicalDevice());
+    UniformBufferObject ubo{};
+    getPrerotationMatrix(swapChainSupport.capabilities, pretransformFlag,
+                         ubo.mvp);
+    void *data;
+    vkMapMemory(device->getDevice(), uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0,
+                &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device->getDevice(), uniformBuffersMemory[currentImage]);
+}
+
+void VKCore::onOrientationChange() {
+    recreateSwapChain();
+    orientationChanged = false;
+}
+
+void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
+                                  uint32_t imageIndex) {
+    VkCommandBufferBeginInfo beginInfo{};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = 0;
+    beginInfo.pInheritanceInfo = nullptr;
+
+    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
+
+    VkRenderPassBeginInfo renderPassInfo{};
+    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderPassInfo.renderPass = renderPass;
+    renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+    renderPassInfo.renderArea.offset = {0, 0};
+    renderPassInfo.renderArea.extent = swapChainExtent;
+
+    VkViewport viewport{};
+    viewport.width = (float)swapChainExtent.width;
+    viewport.height = (float)swapChainExtent.height;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.extent = swapChainExtent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+    static float grey;
+    grey += 0.005f;
+    if (grey > 1.0f) {
+        grey = 0.0f;
+    }
+    VkClearValue clearColor = {{{grey, grey, grey, 1.0f}}};
+
+    renderPassInfo.clearValueCount = 1;
+    renderPassInfo.pClearValues = &clearColor;
+    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
+                         VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      graphicsPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayout, 0, 1, &descriptorSets[currentFrame],
+                            0, nullptr);
+
+    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdEndRenderPass(commandBuffer);
+    VK_CHECK(vkEndCommandBuffer(commandBuffer));
+}
+
+void VKCore::cleanupSwapChain() {
+    for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
+        vkDestroyFramebuffer(device->getDevice(), swapChainFramebuffers[i], nullptr);
+    }
+
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+        vkDestroyImageView(device->getDevice(), swapChainImageViews[i], nullptr);
+    }
+
+    vkDestroySwapchainKHR(device->getDevice(), swapChain, nullptr);
+}
+
+void VKCore::cleanup() {
+    vkDeviceWaitIdle(device->getDevice());
+    cleanupSwapChain();
+    vkDestroyDescriptorPool(device->getDevice(), descriptorPool, nullptr);
+
+    vkDestroyDescriptorSetLayout(device->getDevice(), descriptorSetLayout, nullptr);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroyBuffer(device->getDevice(), uniformBuffers[i], nullptr);
+        vkFreeMemory(device->getDevice(), uniformBuffersMemory[i], nullptr);
+    }
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(device->getDevice(), imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(device->getDevice(), renderFinishedSemaphores[i], nullptr);
+        vkDestroyFence(device->getDevice(), inFlightFences[i], nullptr);
+    }
+    vkDestroyCommandPool(device->getDevice(), commandPool, nullptr);
+    vkDestroyPipeline(device->getDevice(), graphicsPipeline, nullptr);
+    vkDestroyPipelineLayout(device->getDevice(), pipelineLayout, nullptr);
+    vkDestroyRenderPass(device->getDevice(), renderPass, nullptr);
+    vkDestroyDevice(device->getDevice(), nullptr);
+    if (enableValidationLayers) {
+        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+    }
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    vkDestroyInstance(instance, nullptr);
+    initialized = false;
+}
+
 void VKCore::setupDebugMessenger() {
     if (!enableValidationLayers) {
         return;
@@ -340,9 +507,9 @@ bool VKCore::checkValidationLayerSupport() {
     std::vector<VkLayerProperties> availableLayers(layerCount);
     vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
 
-    for (const char *layerName: validationLayers) {
+    for (const char *layerName : validationLayers) {
         bool layerFound = false;
-        for (const auto &layerProperties: availableLayers) {
+        for (const auto &layerProperties : availableLayers) {
             if (strcmp(layerName, layerProperties.layerName) == 0) {
                 layerFound = true;
                 break;
@@ -384,7 +551,7 @@ void VKCore::createInstance() {
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &appInfo;
-    createInfo.enabledExtensionCount = (uint32_t) requiredExtensions.size();
+    createInfo.enabledExtensionCount = (uint32_t)requiredExtensions.size();
     createInfo.ppEnabledExtensionNames = requiredExtensions.data();
     createInfo.pApplicationInfo = &appInfo;
 
@@ -394,7 +561,7 @@ void VKCore::createInstance() {
                 static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
         populateDebugMessengerCreateInfo(debugCreateInfo);
-        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *) &debugCreateInfo;
+        createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
     } else {
         createInfo.enabledLayerCount = 0;
         createInfo.pNext = nullptr;
@@ -407,7 +574,7 @@ void VKCore::createInstance() {
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount,
                                            extensions.data());
     LOG_INFO("available extensions");
-    for (const auto &extension: extensions) {
+    for (const auto &extension : extensions) {
         LOG_INFO("\t %s", extension.extensionName);
     }
 }
@@ -434,6 +601,8 @@ void VKCore::createSurface() {
 
 // BEGIN DEVICE SUITABILITY
 // Functions to find a suitable physical device to execute Vulkan commands.
+
+// END DEVICE SUITABILITY
 
 VkExtent2D VKCore::chooseSwapExtent(
         const VkSurfaceCapabilitiesKHR &capabilities) {
@@ -479,7 +648,7 @@ void VKCore::createSwapChain() {
 
     auto chooseSwapSurfaceFormat =
             [](const std::vector<VkSurfaceFormatKHR> &availableFormats) {
-                for (const auto &availableFormat: availableFormats) {
+                for (const auto &availableFormat : availableFormats) {
                     if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
                         availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                         return availableFormat;
@@ -546,26 +715,6 @@ void VKCore::createSwapChain() {
     swapChainExtent = displaySizeIdentity;
 }
 
-void VKCore::recreateSwapChain() {
-    vkDeviceWaitIdle(device->getDevice());
-    cleanupSwapChain();
-    createSwapChain();
-    createImageViews();
-    createFramebuffers();
-}
-
-void VKCore::cleanupSwapChain() {
-    for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-        vkDestroyFramebuffer(device->getDevice(), swapChainFramebuffers[i], nullptr);
-    }
-
-    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        vkDestroyImageView(device->getDevice(), swapChainImageViews[i], nullptr);
-    }
-
-    vkDestroySwapchainKHR(device->getDevice(), swapChain, nullptr);
-}
-
 void VKCore::createImageViews() {
     swapChainImageViews.resize(swapChainImages.size());
     for (size_t i = 0; i < swapChainImages.size(); i++) {
@@ -629,130 +778,6 @@ void VKCore::createRenderPass() {
     renderPassInfo.pDependencies = &dependency;
 
     VK_CHECK(vkCreateRenderPass(device->getDevice(), &renderPassInfo, nullptr, &renderPass));
-}
-
-VkShaderModule VKCore::createShaderModule(const std::vector<uint8_t> &code) {
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-
-    // Satisifies alignment requirements since the allocator
-    // in vector ensures worst case requirements
-    createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
-    VkShaderModule shaderModule;
-    VK_CHECK(vkCreateShaderModule(device->getDevice(), &createInfo, nullptr, &shaderModule));
-
-    return shaderModule;
-}
-
-void VKCore::createFramebuffers() {
-    swapChainFramebuffers.resize(swapChainImageViews.size());
-    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
-        VkImageView attachments[] = {swapChainImageViews[i]};
-
-        VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass = renderPass;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments = attachments;
-        framebufferInfo.width = swapChainExtent.width;
-        framebufferInfo.height = swapChainExtent.height;
-        framebufferInfo.layers = 1;
-
-        VK_CHECK(vkCreateFramebuffer(device->getDevice(), &framebufferInfo, nullptr,
-                                     &swapChainFramebuffers[i]));
-    }
-}
-
-void VKCore::createCommandPool() {
-    QueueFamilyIndices queueFamilyIndices = device->findQueueFamilies(device->getPhysicalDevice());
-    VkCommandPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-    VK_CHECK(vkCreateCommandPool(device->getDevice(), &poolInfo, nullptr, &commandPool));
-}
-
-void VKCore::createCommandBuffer() {
-    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-    VkCommandBufferAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.commandPool = commandPool;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandBufferCount = commandBuffers.size();
-
-    VK_CHECK(vkAllocateCommandBuffers(device->getDevice(), &allocInfo, commandBuffers.data()));
-}
-
-void VKCore::createSyncObjects() {
-    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
-    VkSemaphoreCreateInfo semaphoreInfo{};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-    VkFenceCreateInfo fenceInfo{};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VK_CHECK(vkCreateSemaphore(device->getDevice(), &semaphoreInfo, nullptr,
-                                   &imageAvailableSemaphores[i]));
-
-        VK_CHECK(vkCreateSemaphore(device->getDevice(), &semaphoreInfo, nullptr,
-                                   &renderFinishedSemaphores[i]));
-
-        VK_CHECK(vkCreateFence(device->getDevice(), &fenceInfo, nullptr, &inFlightFences[i]));
-    }
-}
-
-void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
-                                    uint32_t imageIndex) {
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = 0;
-    beginInfo.pInheritanceInfo = nullptr;
-
-    VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo));
-
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = renderPass;
-    renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = swapChainExtent;
-
-    VkViewport viewport{};
-    viewport.width = (float) swapChainExtent.width;
-    viewport.height = (float) swapChainExtent.height;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.extent = swapChainExtent;
-    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-    static float grey;
-    grey += 0.005f;
-    if (grey > 1.0f) {
-        grey = 0.0f;
-    }
-    VkClearValue clearColor = {{{grey, grey, grey, 1.0f}}};
-
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo,
-                         VK_SUBPASS_CONTENTS_INLINE);
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      graphicsPipeline);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSets[currentFrame],
-                            0, nullptr);
-
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-    vkCmdEndRenderPass(commandBuffer);
-    VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
 /*
@@ -908,103 +933,77 @@ void VKCore::createGraphicsPipeline() {
     vkDestroyShaderModule(device->getDevice(), vertShaderModule, nullptr);
 }
 
-void VKCore::render() {
-    if (orientationChanged)
-    {
-        recreateSwapChain();
-        orientationChanged = false;
-    }
+VkShaderModule VKCore::createShaderModule(const std::vector<uint8_t> &code) {
+    VkShaderModuleCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.codeSize = code.size();
 
-    vkWaitForFences(device->getDevice(), 1, &inFlightFences[currentFrame], VK_TRUE,
-                    UINT64_MAX);
-    uint32_t imageIndex;
-    VkResult result = vkAcquireNextImageKHR(
-            device->getDevice(), swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame],
-            VK_NULL_HANDLE, &imageIndex);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapChain();
-        return;
-    }
-    assert(result == VK_SUCCESS ||
-           result == VK_SUBOPTIMAL_KHR);  // failed to acquire swap chain image
-    updateUniformBuffer(currentFrame);
+    // Satisifies alignment requirements since the allocator
+    // in vector ensures worst case requirements
+    createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+    VkShaderModule shaderModule;
+    VK_CHECK(vkCreateShaderModule(device->getDevice(), &createInfo, nullptr, &shaderModule));
 
-    vkResetFences(device->getDevice(), 1, &inFlightFences[currentFrame]);
-    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
-    VkPipelineStageFlags waitStages[] = {
-            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-
-    VK_CHECK(vkQueueSubmit(device->getGraphicsQueue(), 1, &submitInfo,
-                           inFlightFences[currentFrame]));
-
-    VkPresentInfoKHR presentInfo{};
-    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = signalSemaphores;
-
-    VkSwapchainKHR swapChains[] = {swapChain};
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = swapChains;
-    presentInfo.pImageIndices = &imageIndex;
-    presentInfo.pResults = nullptr;
-
-    result = vkQueuePresentKHR(device->getPresentQueue(), &presentInfo);
-    if (result == VK_SUBOPTIMAL_KHR) {
-        orientationChanged = true;
-    } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        recreateSwapChain();
-    } else {
-        assert(result == VK_SUCCESS);  // failed to present swap chain image!
-    }
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    return shaderModule;
 }
 
-void VKCore::reset() {
-    createSurface();
-    recreateSwapChain();
+void VKCore::createFramebuffers() {
+    swapChainFramebuffers.resize(swapChainImageViews.size());
+    for (size_t i = 0; i < swapChainImageViews.size(); i++) {
+        VkImageView attachments[] = {swapChainImageViews[i]};
+
+        VkFramebufferCreateInfo framebufferInfo{};
+        framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebufferInfo.renderPass = renderPass;
+        framebufferInfo.attachmentCount = 1;
+        framebufferInfo.pAttachments = attachments;
+        framebufferInfo.width = swapChainExtent.width;
+        framebufferInfo.height = swapChainExtent.height;
+        framebufferInfo.layers = 1;
+
+        VK_CHECK(vkCreateFramebuffer(device->getDevice(), &framebufferInfo, nullptr,
+                                     &swapChainFramebuffers[i]));
+    }
 }
 
-VKCore::~VKCore() {
-    vkDeviceWaitIdle(device->getDevice());
-    cleanupSwapChain();
-    vkDestroyDescriptorPool(device->getDevice(), descriptorPool, nullptr);
+void VKCore::createCommandPool() {
+    QueueFamilyIndices queueFamilyIndices = device->findQueueFamilies(device->getPhysicalDevice());
+    VkCommandPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+    VK_CHECK(vkCreateCommandPool(device->getDevice(), &poolInfo, nullptr, &commandPool));
+}
 
-    vkDestroyDescriptorSetLayout(device->getDevice(), descriptorSetLayout, nullptr);
+void VKCore::createCommandBuffer() {
+    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    VkCommandBufferAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    allocInfo.commandPool = commandPool;
+    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocInfo.commandBufferCount = commandBuffers.size();
 
+    VK_CHECK(vkAllocateCommandBuffers(device->getDevice(), &allocInfo, commandBuffers.data()));
+}
+
+void VKCore::createSyncObjects() {
+    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fenceInfo{};
+    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(device->getDevice(), uniformBuffers[i], nullptr);
-        vkFreeMemory(device->getDevice(), uniformBuffersMemory[i], nullptr);
-    }
+        VK_CHECK(vkCreateSemaphore(device->getDevice(), &semaphoreInfo, nullptr,
+                                   &imageAvailableSemaphores[i]));
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(device->getDevice(), imageAvailableSemaphores[i], nullptr);
-        vkDestroySemaphore(device->getDevice(), renderFinishedSemaphores[i], nullptr);
-        vkDestroyFence(device->getDevice(), inFlightFences[i], nullptr);
+        VK_CHECK(vkCreateSemaphore(device->getDevice(), &semaphoreInfo, nullptr,
+                                   &renderFinishedSemaphores[i]));
+
+        VK_CHECK(vkCreateFence(device->getDevice(), &fenceInfo, nullptr, &inFlightFences[i]));
     }
-    vkDestroyCommandPool(device->getDevice(), commandPool, nullptr);
-    vkDestroyPipeline(device->getDevice(), graphicsPipeline, nullptr);
-    vkDestroyPipelineLayout(device->getDevice(), pipelineLayout, nullptr);
-    vkDestroyRenderPass(device->getDevice(), renderPass, nullptr);
-    vkDestroyDevice(device->getDevice(), nullptr);
-    if (enableValidationLayers) {
-        DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-    }
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
 }
