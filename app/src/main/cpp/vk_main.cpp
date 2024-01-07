@@ -23,7 +23,7 @@
 
 #include <iostream>
 
-#include "vk_core.h"
+#include "vk_backend.h"
 
 /*
  * Shared state for the app. This will be accessed within lifecycle callbacks
@@ -41,7 +41,7 @@
  */
 struct VulkanEngine {
   struct android_app *app;
-  VKCore *app_backend;
+  VKBackend *app_backend;
   bool canRender = false;
 };
 
@@ -123,7 +123,7 @@ static void HandleInputEvents(struct android_app *app) {
  */
 void android_main(struct android_app *state) {
   VulkanEngine engine{};
-  VKCore vulkanBackend{};
+  VKBackend vulkanBackend{};
 
   engine.app = state;
   engine.app_backend = &vulkanBackend;
