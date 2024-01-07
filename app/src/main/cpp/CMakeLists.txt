@@ -15,7 +15,7 @@
 #]]
 
 cmake_minimum_required(VERSION 3.18.1)
-project(hellovkjni)
+project(YetAnotherVulkanCubeProject)
 
 # Include the GameActivity static lib to the project.
 find_package(game-activity REQUIRED CONFIG)

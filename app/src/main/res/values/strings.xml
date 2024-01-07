@@ -23,7 +23,7 @@
 
 <resources>
     <!-- Simple strings. -->
-    <string name="hellovk_activity">HelloVk</string>
+    <string name="yavcp_activity">Yet Another Vulkan Cube Project</string>
 
 </resources>
 

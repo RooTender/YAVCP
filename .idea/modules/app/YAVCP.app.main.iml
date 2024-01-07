@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module version="4">
+  <component name="AdditionalModuleElements">
+    <content url="file://$USER_HOME$/.gradle/caches/transforms-3/02773977aa5ea1a00fb01f75d0bc0d11/transformed/jetified-games-activity-1.2.2-alpha01/prefab/modules/game-activity_static/include">
+      <sourceFolder url="file://$USER_HOME$/.gradle/caches/transforms-3/02773977aa5ea1a00fb01f75d0bc0d11/transformed/jetified-games-activity-1.2.2-alpha01/prefab/modules/game-activity_static/include" type="native-header-root" />
+    </content>
+    <content url="file://$MODULE_DIR$/../../../app/src/main" dumb="true">
+      <sourceFolder url="file://$MODULE_DIR$/../../../app/src/main/cpp" type="native-Source-root" />
+    </content>
+  </component>
+</module>
