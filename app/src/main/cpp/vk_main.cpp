@@ -23,7 +23,7 @@
 
 #include <iostream>
 
-#include "vk_backend.h"
+#include "vk_engine/vk_backend.h"
 
 /*
  * Shared state for the app. This will be accessed within lifecycle callbacks
@@ -64,7 +64,7 @@ static void HandleCmd(struct android_app *app, int32_t cmd) {
       if (engine->app->window != nullptr) {
         LOG_INFO("Setting a new surface");
         engine->app_backend->reset(app->window, app->activity->assetManager);
-        if (!engine->app_backend->initialized) {
+        if (!engine->app_backend->isInitialized()) {
           LOG_INFO("Starting application");
           engine->app_backend->initVulkan();
         }
