@@ -41,7 +41,7 @@
  */
 struct VulkanEngine {
   struct android_app *app;
-  vkt::VKUtils *app_backend;
+  VKUtils *app_backend;
   bool canRender = false;
 };
 
@@ -60,12 +60,12 @@ static void HandleCmd(struct android_app *app, int32_t cmd) {
       }
     case APP_CMD_INIT_WINDOW:
       // The window is being shown, get it ready.
-      LOGI("Called - APP_CMD_INIT_WINDOW");
+      LOG_INFO("Called - APP_CMD_INIT_WINDOW");
       if (engine->app->window != nullptr) {
-        LOGI("Setting a new surface");
+        LOG_INFO("Setting a new surface");
         engine->app_backend->reset(app->window, app->activity->assetManager);
         if (!engine->app_backend->initialized) {
-          LOGI("Starting application");
+          LOG_INFO("Starting application");
           engine->app_backend->initVulkan();
         }
         engine->canRender = true;
@@ -77,7 +77,7 @@ static void HandleCmd(struct android_app *app, int32_t cmd) {
       break;
     case APP_CMD_DESTROY:
       // The window is being hidden or closed, clean it up.
-      LOGI("Destroying");
+      LOG_INFO("Destroying");
       engine->app_backend->cleanup();
     default:
       break;
@@ -123,7 +123,7 @@ static void HandleInputEvents(struct android_app *app) {
  */
 void android_main(struct android_app *state) {
   VulkanEngine engine{};
-  vkt::VKUtils vulkanBackend{};
+  VKUtils vulkanBackend{};
 
   engine.app = state;
   engine.app_backend = &vulkanBackend;
