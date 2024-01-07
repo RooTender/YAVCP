@@ -23,7 +23,7 @@
 
 #include <iostream>
 
-#include "vk_utils.h"
+#include "vk_core.h"
 
 /*
  * Shared state for the app. This will be accessed within lifecycle callbacks
@@ -32,7 +32,7 @@
  * We store:
  * struct android_app - a pointer to the Android application handle
  *
- * vkt::VKUtils - a pointer to our (this) Vulkan application in order to call
+ * vkt::VKCore - a pointer to our (this) Vulkan application in order to call
  *  the rendering logic
  *
  * bool canRender - a flag which signals that we are ready to call the vulkan
@@ -41,7 +41,7 @@
  */
 struct VulkanEngine {
   struct android_app *app;
-  VKUtils *app_backend;
+  VKCore *app_backend;
   bool canRender = false;
 };
 
@@ -123,7 +123,7 @@ static void HandleInputEvents(struct android_app *app) {
  */
 void android_main(struct android_app *state) {
   VulkanEngine engine{};
-  VKUtils vulkanBackend{};
+  VKCore vulkanBackend{};
 
   engine.app = state;
   engine.app_backend = &vulkanBackend;
