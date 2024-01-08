@@ -59,7 +59,6 @@ private:
     void createSyncObjects();
     bool checkValidationLayerSupport();
     std::vector<const char *> getRequiredExtensions(bool enableValidation);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
     VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void recreateSwapChain();
@@ -92,12 +91,10 @@ private:
     AAssetManager *assetManager;
 
     VkInstance instance;
-    VkDebugUtilsMessengerEXT debugMessenger;
-
     VkSurfaceKHR surface;
 
-    std::vector<VkImage> swapChainImages;
-    VkExtent2D displaySizeIdentity;
+    VkDebugUtilsMessengerEXT debugMessenger;
+
     std::vector<VkFramebuffer> swapChainFramebuffers;
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
