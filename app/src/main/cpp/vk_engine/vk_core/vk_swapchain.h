@@ -13,6 +13,7 @@ public:
     SwapChain& operator=(const SwapChain&) = delete;
 
     VkSwapchainKHR getSwapChain() const { return swapChain; }
+    VkSurfaceTransformFlagBitsKHR getPretransformFlag() const { return pretransformFlag; }
     std::vector<VkImageView> getSwapChainImageViews() const { return swapChainImageViews; }
     VkFormat getSwapChainImageFormat() const { return swapChainImageFormat; }
     VkExtent2D getSwapChainExtent() const { return swapChainExtent; }
@@ -23,9 +24,9 @@ private:
     VkSwapchainKHR swapChain;
     std::vector<VkImage> swapChainImages;
     std::vector<VkImageView> swapChainImageViews;
-    std::vector<VkFramebuffer> swapChainFramebuffers;
     VkFormat swapChainImageFormat;
     VkExtent2D swapChainExtent;
+    VkSurfaceTransformFlagBitsKHR pretransformFlag;
 
     void createImageViews();
     void createSwapChain();
@@ -61,79 +62,78 @@ void SwapChain::createImageViews() {
 }
 
 void SwapChain::createSwapChain() {
-    SwapChainSupportDetails swapChainSupport = device.querySwapChainSupport(device.getPhysicalDevice());
+    SwapChainSupportDetails swapChainSupport =
+            device.querySwapChainSupport(device.getPhysicalDevice());
 
-    // Choose the surface format
-    VkSurfaceFormatKHR surfaceFormat = swapChainSupport.formats[0];
-    for (const auto& availableFormat : swapChainSupport.formats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            surfaceFormat = availableFormat;
-            break;
-        }
-    }
+    auto chooseSwapSurfaceFormat =
+            [](const std::vector<VkSurfaceFormatKHR> &availableFormats) {
+                for (const auto &availableFormat : availableFormats) {
+                    if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+                        availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+                        return availableFormat;
+                    }
+                }
+                return availableFormats[0];
+            };
 
-    // Choose the present mode
+    VkSurfaceFormatKHR surfaceFormat =
+            chooseSwapSurfaceFormat(swapChainSupport.formats);
+
+    // Please check
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPresentModeKHR.html
+    // for a discourse on different present modes.
+    //
+    // VK_PRESENT_MODE_FIFO_KHR = Hard Vsync
+    // This is always supported on Android phones
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    for (const auto& availablePresentMode : swapChainSupport.presentModes) {
-        if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-            presentMode = availablePresentMode;
-            break;
-        }
-    }
 
-    // Set the swap extent
-    VkExtent2D extent = getDisplaySizeIdentity();
-    if (swapChainSupport.capabilities.currentExtent.width != UINT32_MAX) {
-        extent = swapChainSupport.capabilities.currentExtent;
-    }
-
-    // Specify the number of images in the swap chain
     uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0 &&
         imageCount > swapChainSupport.capabilities.maxImageCount) {
         imageCount = swapChainSupport.capabilities.maxImageCount;
     }
 
-    // Create the swap chain
+    pretransformFlag = swapChainSupport.capabilities.currentTransform;
+    auto displaySizeIdentity = getDisplaySizeIdentity();
+
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface = device.getSurface();
     createInfo.minImageCount = imageCount;
     createInfo.imageFormat = surfaceFormat.format;
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
-    createInfo.imageExtent = extent;
+    createInfo.imageExtent = displaySizeIdentity;
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.preTransform = pretransformFlag;
 
-    // Set the queue families
     QueueFamilyIndices indices = device.findQueueFamilies(device.getPhysicalDevice());
-    uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+    uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(),
+                                     indices.presentFamily.value()};
+
     if (indices.graphicsFamily != indices.presentFamily) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
     } else {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.queueFamilyIndexCount = 0;
+        createInfo.pQueueFamilyIndices = nullptr;
     }
-
-    // Other swap chain parameters
-    createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
     createInfo.presentMode = presentMode;
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    // Create the swap chain
     VK_CHECK(vkCreateSwapchainKHR(device.getDevice(), &createInfo, nullptr, &swapChain));
 
-    // Retrieve the swap chain images
     vkGetSwapchainImagesKHR(device.getDevice(), swapChain, &imageCount, nullptr);
     swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(device.getDevice(), swapChain, &imageCount, swapChainImages.data());
+    vkGetSwapchainImagesKHR(device.getDevice(), swapChain, &imageCount,
+                            swapChainImages.data());
 
     swapChainImageFormat = surfaceFormat.format;
-    swapChainExtent = extent;
+    swapChainExtent = displaySizeIdentity;
 }
 
 VkExtent2D SwapChain::getDisplaySizeIdentity() {
@@ -154,10 +154,6 @@ VkExtent2D SwapChain::getDisplaySizeIdentity() {
 }
 
 SwapChain::~SwapChain() {
-    for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
-        vkDestroyFramebuffer(device.getDevice(), swapChainFramebuffers[i], nullptr);
-    }
-
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
         vkDestroyImageView(device.getDevice(), swapChainImageViews[i], nullptr);
     }

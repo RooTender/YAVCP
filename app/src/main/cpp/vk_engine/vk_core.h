@@ -39,6 +39,7 @@ public:
     void initVulkan();
     void render();
     void cleanup();
+    void cleanupSwapChain();
     void reset(ANativeWindow *newWindow, AAssetManager *newManager);
     bool initialized = false;
 
@@ -52,11 +53,13 @@ private:
     void createRenderPass();
     void createDescriptorSetLayout();
     void createGraphicsPipeline();
+    void createFramebuffers();
     void createCommandPool();
     void createCommandBuffer();
     void createSyncObjects();
     bool checkValidationLayerSupport();
     std::vector<const char *> getRequiredExtensions(bool enableValidation);
+    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
     VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void recreateSwapChain();
@@ -93,6 +96,8 @@ private:
 
     VkSurfaceKHR surface;
 
+    std::vector<VkImage> swapChainImages;
+    VkExtent2D displaySizeIdentity;
     std::vector<VkFramebuffer> swapChainFramebuffers;
     VkCommandPool commandPool;
     std::vector<VkCommandBuffer> commandBuffers;
@@ -113,25 +118,23 @@ private:
 
     uint32_t currentFrame = 0;
     bool orientationChanged = false;
-    VkSurfaceTransformFlagBitsKHR pretransformFlag;
-
-    void createFramebuffers();
 };
 
 void VKCore::initVulkan() {
     createInstance();
     createSurface();
     device = std::make_unique<Device>(instance, surface);
-    swapChain = std::make_unique<SwapChain>(*device);
 
     setupDebugMessenger();
+
+    swapChain = std::make_unique<SwapChain>(*device);
     createRenderPass();
-    createFramebuffers();
     createDescriptorSetLayout();
     createUniformBuffers();
     createDescriptorPool();
     createDescriptorSets();
     createGraphicsPipeline();
+    createFramebuffers();
     createCommandPool();
     createCommandBuffer();
     createSyncObjects();
@@ -175,7 +178,7 @@ void VKCore::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
  * expressed through a uint32_t.
  */
 uint32_t VKCore::findMemoryType(uint32_t typeFilter,
-                                 VkMemoryPropertyFlags properties) {
+                                VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(device->getPhysicalDevice(), &memProperties);
 
@@ -232,6 +235,7 @@ void VKCore::reset(ANativeWindow *newWindow, AAssetManager *newManager) {
 
 void VKCore::recreateSwapChain() {
     vkDeviceWaitIdle(device->getDevice());
+    cleanupSwapChain();
     swapChain = std::make_unique<SwapChain>(*device);
     createFramebuffers();
 }
@@ -370,7 +374,7 @@ void VKCore::updateUniformBuffer(uint32_t currentImage) {
     SwapChainSupportDetails swapChainSupport =
             device->querySwapChainSupport(device->getPhysicalDevice());
     UniformBufferObject ubo{};
-    getPrerotationMatrix(swapChainSupport.capabilities, pretransformFlag,
+    getPrerotationMatrix(swapChainSupport.capabilities, swapChain->getPretransformFlag(),
                          ubo.mvp);
     void *data;
     vkMapMemory(device->getDevice(), uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0,
@@ -385,7 +389,7 @@ void VKCore::onOrientationChange() {
 }
 
 void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
-                                  uint32_t imageIndex) {
+                                 uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = 0;
@@ -401,7 +405,6 @@ void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
     renderPassInfo.renderArea.extent = swapChain->getSwapChainExtent();
 
     VkViewport viewport{};
-
     viewport.width = (float)swapChain->getSwapChainExtent().width;
     viewport.height = (float)swapChain->getSwapChainExtent().height;
     viewport.minDepth = 0.0f;
@@ -434,8 +437,15 @@ void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
 
+void VKCore::cleanupSwapChain() {
+    for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
+        vkDestroyFramebuffer(device->getDevice(), swapChainFramebuffers[i], nullptr);
+    }
+}
+
 void VKCore::cleanup() {
     vkDeviceWaitIdle(device->getDevice());
+    cleanupSwapChain();
     swapChain = nullptr;
     vkDestroyDescriptorPool(device->getDevice(), descriptorPool, nullptr);
 
