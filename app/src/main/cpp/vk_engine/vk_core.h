@@ -68,7 +68,7 @@ private:
                       VkMemoryPropertyFlags properties, VkBuffer &buffer,
                       VkDeviceMemory &bufferMemory);
     void createUniformBuffers();
-    void updateUniformBuffer(uint32_t currentImage);
+    void updateUniformBuffers(uint32_t currentImage);
 
     /*
      * In order to enable validation layer toggle this to true and
@@ -208,7 +208,7 @@ void VKCore::render() {
     }
     assert(result == VK_SUCCESS ||
            result == VK_SUBOPTIMAL_KHR);  // failed to acquire swap chain image
-    updateUniformBuffer(currentFrame);
+    updateUniformBuffers(currentFrame);
 
     vkResetFences(device->getDevice(), 1, &inFlightFences[currentFrame]);
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
@@ -276,7 +276,7 @@ void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
     }
 }
 
-void VKCore::updateUniformBuffer(uint32_t currentImage) {
+void VKCore::updateUniformBuffers(uint32_t currentImage) {
     static auto startTime = std::chrono::high_resolution_clock::now();
 
     auto currentTime = std::chrono::high_resolution_clock::now();
@@ -288,7 +288,9 @@ void VKCore::updateUniformBuffer(uint32_t currentImage) {
     ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(radiansToRotate), glm::vec3(1.0f, 0.0f, 0.0f)); // Rotate around x-axis
     ubo.model = glm::rotate(ubo.model, time * glm::radians(radiansToRotate), glm::vec3(0.0f, 1.0f, 0.0f)); // Rotate around y-axis
     ubo.model = glm::rotate(ubo.model, time * glm::radians(radiansToRotate), glm::vec3(0.0f, 0.0f, 1.0f)); // Rotate around z-axis
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.view = glm::lookAt(glm::vec3(4.0f, 4.0f, 4.0f),
+                           glm::vec3(0.0f, 0.0f, 0.0f),
+                           glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapChain->getSwapChainExtent().width / (float) swapChain->getSwapChainExtent().height, 0.1f, 10.0f);
 
     void *data;
