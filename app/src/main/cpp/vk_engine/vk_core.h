@@ -283,7 +283,11 @@ void VKCore::updateUniformBuffer(uint32_t currentImage) {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
 
     UniformBufferObject ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    auto radiansToRotate = 60.0f;
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(radiansToRotate), glm::vec3(1.0f, 0.0f, 0.0f)); // Rotate around x-axis
+    ubo.model = glm::rotate(ubo.model, time * glm::radians(radiansToRotate), glm::vec3(0.0f, 1.0f, 0.0f)); // Rotate around y-axis
+    ubo.model = glm::rotate(ubo.model, time * glm::radians(radiansToRotate), glm::vec3(0.0f, 0.0f, 1.0f)); // Rotate around z-axis
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapChain->getSwapChainExtent().width / (float) swapChain->getSwapChainExtent().height, 0.1f, 10.0f);
 
@@ -325,7 +329,7 @@ void VKCore::drawFrame(VkCommandBuffer commandBuffer,
     scissor.extent = swapChain->getSwapChainExtent();
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    VkClearValue clearColor = {{{0.5f, 1.0f, 0.25f, 1.0f}}};
+    VkClearValue clearColor = {{{0.25f, 0.3f, 0.25f, 1.0f}}};
 
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
