@@ -26,6 +26,7 @@ public:
     Device& operator=(const Device&) = delete;
 
     VkDevice getDevice() const { return device; }
+    VkSurfaceKHR getSurface() const { return surface; }
     VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
     VkQueue getGraphicsQueue() const { return graphicsQueue; }
     VkQueue getPresentQueue() const { return presentQueue; }
