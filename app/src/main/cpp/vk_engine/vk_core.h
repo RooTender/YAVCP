@@ -53,7 +53,7 @@ private:
     void setupDebugMessenger();
     void createRenderPass();
     //void createDescriptorSetLayout();
-    void createGraphicsPipeline();
+    void setPipeline();
     void createFramebuffers();
     void createCommandPool();
     void createCommandBuffer();
@@ -61,7 +61,7 @@ private:
     bool checkValidationLayerSupport();
     std::vector<const char *> getRequiredExtensions(bool enableValidation);
     VkShaderModule createShaderModule(const std::vector<uint8_t> &code);
-    void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    void drawFrame(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void recreateSwapChain();
     void onOrientationChange();
     uint32_t findMemoryType(uint32_t typeFilter,
@@ -125,7 +125,7 @@ void VKCore::initVulkan() {
     createUniformBuffers();
 
     descriptor = std::make_unique<Descriptor>(*device, uniformBuffers);
-    createGraphicsPipeline();
+    setPipeline();
     createFramebuffers();
     createCommandPool();
     createCommandBuffer();
@@ -237,7 +237,7 @@ void VKCore::render() {
     vkResetFences(device->getDevice(), 1, &inFlightFences[currentFrame]);
     vkResetCommandBuffer(commandBuffers[currentFrame], 0);
 
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+    drawFrame(commandBuffers[currentFrame], imageIndex);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -318,8 +318,8 @@ void VKCore::onOrientationChange() {
     orientationChanged = false;
 }
 
-void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
-                                 uint32_t imageIndex) {
+void VKCore::drawFrame(VkCommandBuffer commandBuffer,
+                       uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = 0;
@@ -585,7 +585,7 @@ void VKCore::createRenderPass() {
  * a 4x4 rotation matrix specified by the descriptorSetLayout. This is required
  * in order to render a rotated scene when the device has been rotated.
  */
-void VKCore::createGraphicsPipeline() {
+void VKCore::setPipeline() {
     auto vertShaderCode =
             LoadBinaryFileToVector("shaders/shader.vert.spv", assetManager);
     auto fragShaderCode =
