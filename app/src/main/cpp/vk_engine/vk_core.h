@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "vk_core/vk_swapchain.h"
+#include "vk_core/vk_descriptor.h"
 
 #include <array>
 #include <fstream>
@@ -46,12 +46,13 @@ public:
 private:
     std::unique_ptr<Device> device;
     std::unique_ptr<SwapChain> swapChain;
+    std::unique_ptr<Descriptor> descriptor;
 
     void createInstance();
     void createSurface();
     void setupDebugMessenger();
     void createRenderPass();
-    void createDescriptorSetLayout();
+    //void createDescriptorSetLayout();
     void createGraphicsPipeline();
     void createFramebuffers();
     void createCommandPool();
@@ -70,8 +71,8 @@ private:
                       VkDeviceMemory &bufferMemory);
     void createUniformBuffers();
     void updateUniformBuffer(uint32_t currentImage);
-    void createDescriptorPool();
-    void createDescriptorSets();
+    //void createDescriptorPool();
+    //void createDescriptorSets();
 
     /*
      * In order to enable validation layer toggle this to true and
@@ -100,7 +101,6 @@ private:
     std::vector<VkCommandBuffer> commandBuffers;
 
     VkRenderPass renderPass;
-    VkDescriptorSetLayout descriptorSetLayout;
     VkPipelineLayout pipelineLayout;
     VkPipeline graphicsPipeline;
 
@@ -110,8 +110,6 @@ private:
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
-    VkDescriptorPool descriptorPool;
-    std::vector<VkDescriptorSet> descriptorSets;
 
     uint32_t currentFrame = 0;
     bool orientationChanged = false;
@@ -126,10 +124,9 @@ void VKCore::initVulkan() {
 
     swapChain = std::make_unique<SwapChain>(*device);
     createRenderPass();
-    createDescriptorSetLayout();
     createUniformBuffers();
-    createDescriptorPool();
-    createDescriptorSets();
+
+    descriptor = std::make_unique<Descriptor>(*device, uniformBuffers);
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
@@ -202,23 +199,6 @@ void VKCore::createUniformBuffers() {
                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                      uniformBuffers[i], uniformBuffersMemory[i]);
     }
-}
-
-void VKCore::createDescriptorSetLayout() {
-    VkDescriptorSetLayoutBinding uboLayoutBinding{};
-    uboLayoutBinding.binding = 0;
-    uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    uboLayoutBinding.descriptorCount = 1;
-    uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    uboLayoutBinding.pImmutableSamplers = nullptr;
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo{};
-    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &uboLayoutBinding;
-
-    VK_CHECK(vkCreateDescriptorSetLayout(device->getDevice(), &layoutInfo, nullptr,
-                                         &descriptorSetLayout));
 }
 
 void VKCore::reset(ANativeWindow *newWindow, AAssetManager *newManager) {
@@ -322,51 +302,6 @@ void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
     }
 }
 
-void VKCore::createDescriptorPool() {
-    VkDescriptorPoolSize poolSize{};
-    poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-
-    VkDescriptorPoolCreateInfo poolInfo{};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
-    poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-
-    VK_CHECK(vkCreateDescriptorPool(device->getDevice(), &poolInfo, nullptr, &descriptorPool));
-}
-
-void VKCore::createDescriptorSets() {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT,
-                                               descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    allocInfo.pSetLayouts = layouts.data();
-
-    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    VK_CHECK(vkAllocateDescriptorSets(device->getDevice(), &allocInfo, descriptorSets.data()));
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = uniformBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(UniformBufferObject);
-
-        VkWriteDescriptorSet descriptorWrite{};
-        descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrite.dstSet = descriptorSets[i];
-        descriptorWrite.dstBinding = 0;
-        descriptorWrite.dstArrayElement = 0;
-        descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptorWrite.descriptorCount = 1;
-        descriptorWrite.pBufferInfo = &bufferInfo;
-
-        vkUpdateDescriptorSets(device->getDevice(), 1, &descriptorWrite, 0, nullptr);
-    }
-}
-
 void VKCore::updateUniformBuffer(uint32_t currentImage) {
     SwapChainSupportDetails swapChainSupport =
             device->querySwapChainSupport(device->getPhysicalDevice());
@@ -426,7 +361,7 @@ void VKCore::recordCommandBuffer(VkCommandBuffer commandBuffer,
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                       graphicsPipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipelineLayout, 0, 1, &descriptorSets[currentFrame],
+                            pipelineLayout, 0, 1, &descriptor->getDescriptorSets()[currentFrame],
                             0, nullptr);
 
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
@@ -444,9 +379,7 @@ void VKCore::cleanup() {
     vkDeviceWaitIdle(device->getDevice());
     cleanupSwapChain();
     swapChain = nullptr;
-    vkDestroyDescriptorPool(device->getDevice(), descriptorPool, nullptr);
-
-    vkDestroyDescriptorSetLayout(device->getDevice(), descriptorSetLayout, nullptr);
+    descriptor = nullptr;
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroyBuffer(device->getDevice(), uniformBuffers[i], nullptr);
@@ -745,7 +678,7 @@ void VKCore::createGraphicsPipeline() {
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.pSetLayouts = &descriptor->getDescriptorSetLayout();
     pipelineLayoutInfo.pushConstantRangeCount = 0;
     pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
