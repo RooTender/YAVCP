@@ -9,6 +9,8 @@
 
 #include "assert.h"
 #include "vulkan/vulkan.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 namespace vkt
 {
@@ -27,7 +29,9 @@ namespace vkt
     const int MAX_FRAMES_IN_FLIGHT = 2;
 
     struct UniformBufferObject {
-        std::array<float, 16> mvp;
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
     };
 
     struct QueueFamilyIndices {

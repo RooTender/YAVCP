@@ -33,9 +33,12 @@ add_definitions(-DVK_USE_PLATFORM_ANDROID_KHR=1)
 add_library(${PROJECT_NAME} SHARED
     vk_main.cpp)
 
+add_subdirectory(glm)
+
 # add lib dependencies
 target_link_libraries(${PROJECT_NAME} PUBLIC
     vulkan
     game-activity::game-activity_static
     android
-    log)
+    log
+    glm)

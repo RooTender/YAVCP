@@ -5,7 +5,9 @@ layout(location = 0) out vec3 fragColor;
 
 // Uniform buffer containing an MVP matrix.
 layout(binding = 0) uniform UniformBufferObject {
-    mat4 MVP;
+    mat4 model;
+    mat4 view;
+    mat4 proj;
 } ubo;
 
 // Define positions for 12 triangles (6 faces) to form a cube
@@ -47,6 +49,6 @@ vec3 colors[36] = vec3[](
 );
 
 void main() {
-    gl_Position = ubo.MVP * vec4(positions[gl_VertexIndex], 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(positions[gl_VertexIndex], 1.0);
     fragColor = colors[gl_VertexIndex];
 }
