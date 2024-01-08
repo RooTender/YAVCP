@@ -345,12 +345,7 @@ void VKCore::drawFrame(VkCommandBuffer commandBuffer,
     scissor.extent = swapChain->getSwapChainExtent();
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    static float grey;
-    grey += 0.005f;
-    if (grey > 1.0f) {
-        grey = 0.0f;
-    }
-    VkClearValue clearColor = {{{grey, grey, grey, 1.0f}}};
+    VkClearValue clearColor = {{{0.5f, 1.0f, 0.25f, 1.0f}}};
 
     renderPassInfo.clearValueCount = 1;
     renderPassInfo.pClearValues = &clearColor;
