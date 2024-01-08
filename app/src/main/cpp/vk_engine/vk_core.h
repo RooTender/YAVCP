@@ -357,7 +357,7 @@ void VKCore::drawFrame(VkCommandBuffer commandBuffer,
                             pipelineLayout, 0, 1, &descriptor->getDescriptorSets()[currentFrame],
                             0, nullptr);
 
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+    vkCmdDraw(commandBuffer, 36, 1, 0, 0);
     vkCmdEndRenderPass(commandBuffer);
     VK_CHECK(vkEndCommandBuffer(commandBuffer));
 }
