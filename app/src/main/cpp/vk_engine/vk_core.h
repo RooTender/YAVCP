@@ -71,8 +71,6 @@ private:
                       VkDeviceMemory &bufferMemory);
     void createUniformBuffers();
     void updateUniformBuffer(uint32_t currentImage);
-    //void createDescriptorPool();
-    //void createDescriptorSets();
 
     /*
      * In order to enable validation layer toggle this to true and
