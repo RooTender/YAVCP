@@ -64,8 +64,6 @@ private:
     void drawFrame(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void recreateSwapChain();
     void onOrientationChange();
-    uint32_t findMemoryType(uint32_t typeFilter,
-                            VkMemoryPropertyFlags properties);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                       VkMemoryPropertyFlags properties, VkBuffer &buffer,
                       VkDeviceMemory &bufferMemory);
@@ -156,33 +154,11 @@ void VKCore::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex =
-            findMemoryType(memRequirements.memoryTypeBits, properties);
+    allocInfo.memoryTypeIndex = device->findMemoryType(memRequirements.memoryTypeBits, properties);
 
     VK_CHECK(vkAllocateMemory(device->getDevice(), &allocInfo, nullptr, &bufferMemory));
 
     vkBindBufferMemory(device->getDevice(), buffer, bufferMemory, 0);
-}
-
-/*
- * Finds the index of the memory heap which matches a particular buffer's memory
- * requirements. Vulkan manages these requirements as a bitset, in this case
- * expressed through a uint32_t.
- */
-uint32_t VKCore::findMemoryType(uint32_t typeFilter,
-                                VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memProperties;
-    vkGetPhysicalDeviceMemoryProperties(device->getPhysicalDevice(), &memProperties);
-
-    for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
-        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags &
-                                        properties) == properties) {
-            return i;
-        }
-    }
-
-    assert(false);  // failed to find suitable memory type!
-    return -1;
 }
 
 void VKCore::createUniformBuffers() {
@@ -310,7 +286,6 @@ void VKCore::updateUniformBuffer(uint32_t currentImage) {
     ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapChain->getSwapChainExtent().width / (float) swapChain->getSwapChainExtent().height, 0.1f, 10.0f);
-    ubo.proj[1][1] *= -1; // Invert Y coordinate for Vulkan
 
     void *data;
     vkMapMemory(device->getDevice(), uniformBuffersMemory[currentImage], 0, sizeof(ubo), 0, &data);
@@ -536,6 +511,20 @@ void VKCore::createRenderPass() {
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription depthAttachment{};
+    depthAttachment.format = device->findDepthFormat();
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef{};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
@@ -655,6 +644,14 @@ void VKCore::setPipeline() {
     multisampling.alphaToCoverageEnable = VK_FALSE;
     multisampling.alphaToOneEnable = VK_FALSE;
 
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask =
             VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -707,6 +704,7 @@ void VKCore::setPipeline() {
     pipelineInfo.subpass = 0;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
     pipelineInfo.basePipelineIndex = -1;
+    pipelineInfo.pDepthStencilState = &depthStencil;
 
     VK_CHECK(vkCreateGraphicsPipelines(device->getDevice(), VK_NULL_HANDLE, 1, &pipelineInfo,
                                        nullptr, &graphicsPipeline));
@@ -731,7 +729,10 @@ VkShaderModule VKCore::createShaderModule(const std::vector<uint8_t> &code) {
 void VKCore::createFramebuffers() {
     swapChainFramebuffers.resize(swapChain->getSwapChainImageViews().size());
     for (size_t i = 0; i < swapChain->getSwapChainImageViews().size(); i++) {
-        VkImageView attachments[] = {swapChain->getSwapChainImageViews()[i]};
+        VkImageView attachments[] = {
+            swapChain->getSwapChainImageViews()[i],
+            swapChain->getDepthImageView()
+        };
 
         VkFramebufferCreateInfo framebufferInfo{};
         framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;

@@ -17,6 +17,7 @@ public:
     std::vector<VkImageView> getSwapChainImageViews() const { return swapChainImageViews; }
     VkFormat getSwapChainImageFormat() const { return swapChainImageFormat; }
     VkExtent2D getSwapChainExtent() const { return swapChainExtent; }
+    VkImageView getDepthImageView() const { return depthImageView; }
 
 private:
     Device& device;
@@ -28,15 +29,26 @@ private:
     VkExtent2D swapChainExtent;
     VkSurfaceTransformFlagBitsKHR pretransformFlag;
 
+    VkImage depthImage;
+    VkDeviceMemory depthImageMemory;
+    VkImageView depthImageView;
+
     void createImageViews();
     void createSwapChain();
 
     VkExtent2D getDisplaySizeIdentity();
+
+    void createDepthResources();
+    void destroyDepthResources();
+    void createImage(VkFormat format, VkImage &image, VkDeviceMemory &imageMemory);
+
+    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 };
 
 SwapChain::SwapChain(Device &device)  : device(device) {
     createSwapChain();
     createImageViews();
+    createDepthResources();
 }
 
 void SwapChain::createImageViews() {
@@ -153,7 +165,69 @@ VkExtent2D SwapChain::getDisplaySizeIdentity() {
     return capabilities.currentExtent;
 }
 
+void SwapChain::createDepthResources() {
+    VkFormat depthFormat = device.findDepthFormat();
+
+    createImage(depthFormat, depthImage, depthImageMemory);
+    depthImageView = createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
+void SwapChain::createImage(VkFormat format, VkImage& image, VkDeviceMemory& imageMemory) {
+    VkImageCreateInfo imageInfo{};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = swapChainExtent.width;
+    imageInfo.extent.height = swapChainExtent.height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = format;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VK_CHECK(vkCreateImage(device.getDevice(), &imageInfo, nullptr, &image));
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(device.getDevice(), image, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = device.findMemoryType(memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VK_CHECK(vkAllocateMemory(device.getDevice(), &allocInfo, nullptr, &imageMemory));
+    vkBindImageMemory(device.getDevice(), image, imageMemory, 0);
+}
+
+VkImageView SwapChain::createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags) {
+    VkImageViewCreateInfo viewInfo{};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = image;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = format;
+    viewInfo.subresourceRange.aspectMask = aspectFlags;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.layerCount = 1;
+
+    VkImageView imageView;
+    VK_CHECK(vkCreateImageView(device.getDevice(), &viewInfo, nullptr, &imageView));
+    return imageView;
+}
+
+void SwapChain::destroyDepthResources() {
+    vkDestroyImageView(device.getDevice(), depthImageView, nullptr);
+    vkDestroyImage(device.getDevice(), depthImage, nullptr);
+    vkFreeMemory(device.getDevice(), depthImageMemory, nullptr);
+}
+
 SwapChain::~SwapChain() {
+    destroyDepthResources();
+
     for (size_t i = 0; i < swapChainImageViews.size(); i++) {
         vkDestroyImageView(device.getDevice(), swapChainImageViews[i], nullptr);
     }
