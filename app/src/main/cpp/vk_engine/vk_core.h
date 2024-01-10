@@ -129,7 +129,7 @@ void VKCore::initVulkan() {
     createCommandBuffer();
     createSyncObjects();
     initialized = true;
-};
+}
 
 /*
  *	Create a buffer with specified usage and memory properties
@@ -254,26 +254,6 @@ void VKCore::render() {
         assert(result == VK_SUCCESS);  // failed to present swap chain image!
     }
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-}
-
-/*
- * getPrerotationMatrix handles screen rotation with 3 hardcoded rotation
- * matrices (detailed below). We skip the 180 degrees rotation.
- */
-void getPrerotationMatrix(const VkSurfaceCapabilitiesKHR &capabilities,
-                          const VkSurfaceTransformFlagBitsKHR &pretransformFlag,
-                          std::array<float, 16> &mat) {
-    // mat is initialized to the identity matrix
-    mat = {1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
-    if (pretransformFlag & VK_SURFACE_TRANSFORM_ROTATE_90_BIT_KHR) {
-        // mat is set to a 90 deg rotation matrix
-        mat = {0., 1., 0., 0., -1., 0, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
-    }
-
-    else if (pretransformFlag & VK_SURFACE_TRANSFORM_ROTATE_270_BIT_KHR) {
-        // mat is set to 270 deg rotation matrix
-        mat = {0., -1., 0., 0., 1., 0, 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.};
-    }
 }
 
 void VKCore::updateUniformBuffers(uint32_t currentImage) {
@@ -419,11 +399,11 @@ bool VKCore::checkValidationLayerSupport() {
 }
 
 std::vector<const char *> VKCore::getRequiredExtensions(
-        bool enableValidationLayers) {
+        bool enableValidation) {
     std::vector<const char *> extensions;
     extensions.push_back("VK_KHR_surface");
     extensions.push_back("VK_KHR_android_surface");
-    if (enableValidationLayers) {
+    if (enableValidation) {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     }
     return extensions;
@@ -723,7 +703,7 @@ VkShaderModule VKCore::createShaderModule(const std::vector<uint8_t> &code) {
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
 
-    // Satisifies alignment requirements since the allocator
+    // Satisfies alignment requirements since the allocator
     // in vector ensures worst case requirements
     createInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
     VkShaderModule shaderModule;

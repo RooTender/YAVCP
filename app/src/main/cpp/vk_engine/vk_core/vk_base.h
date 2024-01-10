@@ -1,8 +1,3 @@
-#ifndef YAVCP_VK_CORE_H
-#define YAVCP_VK_CORE_H
-
-#endif //YAVCP_VK_CORE_H
-
 #include "android/log.h"
 #include "android/native_window.h"
 #include "android/native_window_jni.h"

@@ -1,12 +1,3 @@
-//
-// Created by rootender on 1/7/24.
-//
-
-#ifndef YAVCP_VK_DEVICE_H
-#define YAVCP_VK_DEVICE_H
-
-#endif //YAVCP_VK_DEVICE_H
-
 #include "vk_base.h"
 
 #include <stdexcept>
@@ -25,7 +16,7 @@ public:
     Device(const Device&) = delete;
     Device& operator=(const Device&) = delete;
 
-    VkDevice getDevice() const { return device; }
+    VkDevice getDevice() const { return _device; }
     VkInstance getInstance() const { return instance; }
     VkSurfaceKHR getSurface() const { return surface; }
     VkPhysicalDevice getPhysicalDevice() const { return physicalDevice; }
@@ -43,7 +34,7 @@ private:
     VkSurfaceKHR surface;
 
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-    VkDevice device;
+    VkDevice _device;
     VkQueue graphicsQueue;
     VkQueue presentQueue;
 
@@ -68,8 +59,8 @@ Device::Device(VkInstance instance, VkSurfaceKHR surface)
 }
 
 Device::~Device() {
-    if (device != VK_NULL_HANDLE) {
-        vkDestroyDevice(device, nullptr);
+    if (_device != VK_NULL_HANDLE) {
+        vkDestroyDevice(_device, nullptr);
     }
 }
 
@@ -82,9 +73,9 @@ void Device::pickPhysicalDevice() {
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
-    for (const auto& device : devices) {
-        if (isDeviceSuitable(device)) {
-            physicalDevice = device;
+    for (const auto& dev : devices) {
+        if (isDeviceSuitable(dev)) {
+            physicalDevice = dev;
             break;
         }
     }
@@ -119,19 +110,19 @@ void Device::createLogicalDevice() {
     createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
     createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-    if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+    if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &_device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device!");
     }
 
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+    vkGetDeviceQueue(_device, indices.graphicsFamily.value(), 0, &graphicsQueue);
+    vkGetDeviceQueue(_device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
 bool Device::isDeviceSuitable(VkPhysicalDevice device) {
     QueueFamilyIndices indices = findQueueFamilies(device);
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-    bool swapChainAdequate = false;
+    bool swapChainAdequate;
     if (extensionsSupported) {
         SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
         swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();

@@ -1,7 +1,3 @@
-//
-// Created by rootender on 1/8/24.
-//
-
 #include "vk_device.h"
 
 class SwapChain {
@@ -13,7 +9,7 @@ public:
     SwapChain& operator=(const SwapChain&) = delete;
 
     VkSwapchainKHR getSwapChain() const { return swapChain; }
-    VkSurfaceTransformFlagBitsKHR getPretransformFlag() const { return pretransformFlag; }
+
     std::vector<VkImageView> getSwapChainImageViews() const { return swapChainImageViews; }
     VkFormat getSwapChainImageFormat() const { return swapChainImageFormat; }
     VkExtent2D getSwapChainExtent() const { return swapChainExtent; }
